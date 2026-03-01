@@ -1,0 +1,18 @@
+name = "wallet-mcp"
+main = "src/index.ts"
+compatibility_date = "2026-02-10"
+compatibility_flags = ["nodejs_compat"]
+
+[placement]
+mode = "smart"
+
+[vars]
+# Optional default network for wallet tools. Can be a CDP network or RPC URL.
+WALLET_DEFAULT_NETWORK = "aave-v4"
+# WALLET_NETWORK_MAP_JSON = '{"aave-v4":{"rpcUrl":"https://virtual.mainnet-aave.us-east.rpc.tenderly.co/952f8a2f-066a-49ad-8d2b-619eeb411a1f","chainId":123456789}}'
+WALLET_NETWORK_MAP_JSON = '{"aave-v4":{"rpcUrl":"https://virtual.mainnet-aave.us-east.rpc.tenderly.co/dbaa58ab-597b-4bcd-ae6a-b8e50f716146","chainId":123456789}}'
+
+# Optional allowlist (comma-separated). If unset, all networks are allowed.
+WALLET_ALLOWED_NETWORKS = "aave-v4,base-sepolia"
+# Optional Aave GraphQL endpoint used by wallet_aave_fork_top_up.
+# AAVE_GRAPHQL_URL = "https://api.aave.com/graphql"

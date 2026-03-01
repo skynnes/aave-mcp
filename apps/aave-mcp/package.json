@@ -1,0 +1,19 @@
+{
+  "name": "aave-mcp",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --port 8787",
+    "build": "wrangler deploy --dry-run",
+    "check": "ultracite check src package.json tsconfig.json wrangler.toml README.md",
+    "fix": "ultracite fix src package.json tsconfig.json wrangler.toml README.md",
+    "types": "bunx wrangler types",
+    "typecheck": "bun run types && tsc --noEmit"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "catalog:workers",
+    "wrangler": "^4.66.0"
+  }
+}

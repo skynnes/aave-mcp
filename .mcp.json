@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "aave": {
+      "type": "http",
+      "url": "https://localhost:8787/mcp"
+    },
+    "context7": {
+      "type": "remote",
+      "url": "https://mcp.context7.com/mcp",
+      "headers": {
+        "CONTEXT7_API_KEY": "ctx7sk-2967bdb9-db5d-44bc-86ef-4a1a9e59b3ea"
+      },
+      "enabled": true
+    }
+  }
+}

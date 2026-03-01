@@ -1,0 +1,39 @@
+name = "aave-mcp"
+main = "src/index.ts"
+compatibility_date = "2026-02-10"
+compatibility_flags = ["nodejs_compat"]
+
+[[worker_loaders]]
+binding = "LOADER"
+
+[placement]
+mode = "smart"
+
+# =============================================================================
+# Default environment (uses @aave/client production endpoint)
+# =============================================================================
+[vars]
+# Uses default production endpoint from @aave/client
+
+# =============================================================================
+# Aave V3 Production
+# Deploy with: wrangler deploy --env v3
+# =============================================================================
+[env.v3]
+name = "aave-mcp-v3"
+[env.v3.vars]
+AAVE_GRAPHQL_URL = "https://api.v3.aave.com/graphql"
+
+[[env.v3.worker_loaders]]
+binding = "LOADER"
+
+# =============================================================================
+# Aave V4 Production
+# Deploy with: wrangler deploy --env v4
+# =============================================================================
+[env.v4]
+name = "aave-mcp-v4"
+[env.v4.vars]
+AAVE_GRAPHQL_URL = "https://api.aave.com/graphql"
+[[env.v4.worker_loaders]]
+binding = "LOADER"

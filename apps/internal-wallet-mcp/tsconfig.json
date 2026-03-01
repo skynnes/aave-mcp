@@ -1,0 +1,9 @@
+{
+  "extends": "../../packages/tsconfig/base.json",
+  "compilerOptions": {
+    "types": ["./worker-configuration.d.ts"],
+    "strictNullChecks": true,
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*.ts"]
+}

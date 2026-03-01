@@ -1,0 +1,38 @@
+name = "internal-wallet-mcp"
+main = "src/index.ts"
+compatibility_date = "2026-03-01"
+compatibility_flags = ["nodejs_compat"]
+
+[placement]
+mode = "smart"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "internal-wallet-mcp"
+database_id = "replace-with-your-d1-database-id"
+
+[vars]
+# 32-byte base64 key used to encrypt persisted private keys.
+# Generate with: openssl rand -base64 32
+INTERNAL_WALLET_MASTER_KEY = "replace-with-32-byte-base64-key"
+
+# Optional default network. Can be a known name (for example base-sepolia) or RPC URL.
+WALLET_DEFAULT_NETWORK = "base-sepolia"
+
+# Optional alias map for network names.
+# WALLET_NETWORK_MAP_JSON = '{"aave-v4":{"rpcUrl":"https://rpc.example","chainId":123456789}}'
+
+# Optional allowlist (comma-separated). If unset, all networks are allowed.
+# WALLET_ALLOWED_NETWORKS = "aave-v4,base-sepolia"
+
+# Optional ERC20 map used by balance listing and faucet for non-ETH tokens.
+# INTERNAL_WALLET_TOKEN_MAP_JSON = '{"base-sepolia":{"usdc":"0x..."}}'
+
+# Optional faucet funder key. Required for wallet_request_evm_faucet.
+# INTERNAL_WALLET_FAUCET_PRIVATE_KEY = "0x..."
+
+# Optional faucet amounts in base units by token symbol.
+# INTERNAL_WALLET_FAUCET_AMOUNT_MAP_JSON = '{"eth":"10000000000000000","usdc":"1000000"}'
+
+# Optional Aave GraphQL endpoint used by wallet_aave_fork_top_up.
+# AAVE_GRAPHQL_URL = "https://api.aave.com/graphql"

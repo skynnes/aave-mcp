@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev --port 8788 --inspector-port 9230",
+    "dev:cdp": "wrangler dev --port 8788 --inspector-port 9230",
     "build": "wrangler deploy --dry-run",
     "check": "ultracite check src package.json tsconfig.json wrangler.toml README.md",
     "fix": "ultracite fix src package.json tsconfig.json wrangler.toml README.md",

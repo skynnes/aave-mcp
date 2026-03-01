@@ -1,9 +1,14 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "mcp": {
-    "aave": {
+    "aave_v3": {
       "type": "remote",
-      "url": "http://localhost:8787/mcp",
+      "url": "http://localhost:8787/mcp/v3",
+      "oauth": {}
+    },
+    "aave_v4": {
+      "type": "remote",
+      "url": "http://localhost:8787/mcp/v4",
       "oauth": {}
     },
     "wallet": {

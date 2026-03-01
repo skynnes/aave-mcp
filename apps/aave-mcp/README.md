@@ -4,7 +4,7 @@ This app is a focused MCP server for Aave schema exploration and GraphQL executi
 
 ## What this app includes
 
-- MCP endpoint: `/mcp`
+- MCP endpoints: `/mcp/v3` and `/mcp/v4` (`/mcp` defaults to v4)
 - No OAuth requirement (`noauth` tools)
 - Tool: `public_healthcheck`
 - Tool: `search_aave_schema`
@@ -19,12 +19,14 @@ bun run dev
 
 ## MCP endpoint
 
-- Local: `http://localhost:8787/mcp`
-- Deployed: `https://<your-worker>.workers.dev/mcp`
+- Local: `http://localhost:8787/mcp/v3` or `http://localhost:8787/mcp/v4`
+- Deployed: `https://<your-worker>.workers.dev/mcp/v3` or `https://<your-worker>.workers.dev/mcp/v4`
+- Default alias: `http://localhost:8787/mcp` and `https://<your-worker>.workers.dev/mcp` route to v4
 
-## Optional endpoint overrides
+## Version routing
 
-By default, codemode uses `https://api.v3.aave.com/graphql`.
+This worker now routes by path instead of Wrangler environments:
 
-- Deploy v3: `wrangler deploy --env v3`
-- Deploy v4: `wrangler deploy --env v4`
+- `/mcp/v3` -> `https://api.v3.aave.com/graphql`
+- `/mcp/v4` -> `https://api.aave.com/graphql`
+- `/mcp` -> `https://api.aave.com/graphql` (v4 default)

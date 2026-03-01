@@ -16,6 +16,10 @@ database_id = "replace-with-your-d1-database-id"
 # Generate with: openssl rand -base64 32
 INTERNAL_WALLET_MASTER_KEY = "replace-with-32-byte-base64-key"
 
+# Optional pepper used when deriving auth scope from tool-provided seed values.
+# Keep this secret to make seed brute-force harder if database rows are exposed.
+# INTERNAL_WALLET_AUTH_PEPPER = "replace-with-secret-pepper"
+
 # Optional default network. Can be a known name (for example base-sepolia) or RPC URL.
 WALLET_DEFAULT_NETWORK = "base-sepolia"
 

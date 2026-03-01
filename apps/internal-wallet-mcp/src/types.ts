@@ -10,6 +10,7 @@ export interface JsonRpcRequest {
 export interface Env {
   DB?: D1Database;
   INTERNAL_WALLET_MASTER_KEY?: string;
+  INTERNAL_WALLET_AUTH_PEPPER?: string;
   INTERNAL_WALLET_FAUCET_PRIVATE_KEY?: string;
   INTERNAL_WALLET_FAUCET_AMOUNT_MAP_JSON?: string;
   INTERNAL_WALLET_TOKEN_MAP_JSON?: string;

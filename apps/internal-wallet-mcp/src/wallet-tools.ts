@@ -29,7 +29,6 @@ import type { Env, ToolCallParams, ToolCallResponse } from "./types";
 
 const TOOL_GET_OR_CREATE_EVM_ACCOUNT = "wallet_get_or_create_evm_account";
 const TOOL_GET_EVM_ACCOUNT = "wallet_get_evm_account";
-const TOOL_REQUEST_EVM_FAUCET = "wallet_request_evm_faucet";
 const TOOL_LIST_EVM_TOKEN_BALANCES = "wallet_list_evm_token_balances";
 const TOOL_SIGN_EVM_TRANSACTION = "wallet_sign_evm_transaction";
 const TOOL_SEND_EVM_TRANSACTION = "wallet_send_evm_transaction";
@@ -46,12 +45,9 @@ const KNOWN_CHAINS: Record<string, Chain> = {
   arbitrum,
 };
 
-const DEFAULT_FAUCET_NATIVE_AMOUNT_WEI = "10000000000000000";
-
 const toolNameSet = new Set<string>([
   TOOL_GET_OR_CREATE_EVM_ACCOUNT,
   TOOL_GET_EVM_ACCOUNT,
-  TOOL_REQUEST_EVM_FAUCET,
   TOOL_LIST_EVM_TOKEN_BALANCES,
   TOOL_SIGN_EVM_TRANSACTION,
   TOOL_SEND_EVM_TRANSACTION,
@@ -69,6 +65,10 @@ interface ParsedNetworkMapEntry {
   chainId?: number;
 }
 
+interface AuthorizationContext {
+  scopedNamePrefix: string;
+}
+
 interface StoredAccount {
   name: string;
   address: Address;
@@ -78,6 +78,8 @@ interface StoredAccount {
 }
 
 type TokenMap = Record<string, Record<string, Address>>;
+const SCOPED_NAME_SEPARATOR = "::";
+const AUTH_CONTEXT_VERSION = "v1";
 
 const parseRecord = (
   value: Record<string, unknown> | undefined
@@ -194,6 +196,14 @@ const parseOptionalPageSize = (value: unknown): number | undefined => {
   return value as number;
 };
 
+const toHex = (value: Uint8Array): string => {
+  let output = "";
+  for (const byte of value) {
+    output += byte.toString(16).padStart(2, "0");
+  }
+  return output;
+};
+
 const requireDatabase = (env: Env): D1Database => {
   if (!env.DB) {
     throw new Error(
@@ -206,16 +216,22 @@ const requireDatabase = (env: Env): D1Database => {
 
 const ensureSchema = async (env: Env): Promise<void> => {
   const db = requireDatabase(env);
-  await db.exec(`
-    CREATE TABLE IF NOT EXISTS wallet_accounts (
-      name TEXT PRIMARY KEY,
-      address TEXT NOT NULL UNIQUE,
-      encrypted_private_key TEXT NOT NULL,
-      iv TEXT NOT NULL,
-      created_at TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_wallet_accounts_address ON wallet_accounts(address);
-  `);
+  await db
+    .prepare(
+      `CREATE TABLE IF NOT EXISTS wallet_accounts (
+        name TEXT PRIMARY KEY,
+        address TEXT NOT NULL UNIQUE,
+        encrypted_private_key TEXT NOT NULL,
+        iv TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      )`
+    )
+    .run();
+  await db
+    .prepare(
+      "CREATE INDEX IF NOT EXISTS idx_wallet_accounts_address ON wallet_accounts(address)"
+    )
+    .run();
 };
 
 const fromBase64 = (value: string): Uint8Array => {
@@ -235,25 +251,92 @@ const toBase64 = (value: Uint8Array): string => {
   return btoa(binary);
 };
 
-const getMasterKey = (env: Env): Promise<CryptoKey> => {
-  const keyBase64 = parseOptionalString(env.INTERNAL_WALLET_MASTER_KEY);
-  if (!keyBase64) {
-    throw new Error(
-      "Missing INTERNAL_WALLET_MASTER_KEY. Set a base64-encoded 32-byte key."
-    );
-  }
-
-  const keyBytes = fromBase64(keyBase64);
-  if (keyBytes.byteLength !== 32) {
-    throw new Error(
-      "INTERNAL_WALLET_MASTER_KEY must decode to exactly 32 bytes"
-    );
-  }
-
+const importAesGcmKey = (keyBytes: Uint8Array): Promise<CryptoKey> => {
   return crypto.subtle.importKey("raw", keyBytes, "AES-GCM", false, [
     "encrypt",
     "decrypt",
   ]);
+};
+
+const hexToBytes = (value: `0x${string}`): Uint8Array => {
+  const normalized = value.slice(2);
+  const bytes = new Uint8Array(normalized.length / 2);
+  for (let index = 0; index < normalized.length; index += 2) {
+    const chunk = normalized.slice(index, index + 2);
+    const parsed = Number.parseInt(chunk, 16);
+    if (Number.isNaN(parsed)) {
+      throw new Error("Invalid hex key material");
+    }
+    bytes[index / 2] = parsed;
+  }
+  return bytes;
+};
+
+const deriveSha256 = async (value: string): Promise<Uint8Array> => {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(value)
+  );
+  return new Uint8Array(digest);
+};
+
+const buildAuthorizationContext = async (
+  args: Record<string, unknown>,
+  env: Env
+): Promise<AuthorizationContext> => {
+  const seed = parseRequiredString(args.seed, "seed");
+  const pepper = parseOptionalString(env.INTERNAL_WALLET_AUTH_PEPPER) ?? "";
+  const digest = await deriveSha256(
+    `${AUTH_CONTEXT_VERSION}:${pepper}:${seed}`
+  );
+
+  return {
+    scopedNamePrefix: `scope_${toHex(digest)}${SCOPED_NAME_SEPARATOR}`,
+  };
+};
+
+const buildScopedAccountName = (
+  accountName: string,
+  authorization: AuthorizationContext
+): string => {
+  return `${authorization.scopedNamePrefix}${accountName}`;
+};
+
+const parseScopedAccountName = (
+  scopedName: string,
+  authorization: AuthorizationContext
+): string | null => {
+  if (!scopedName.startsWith(authorization.scopedNamePrefix)) {
+    return null;
+  }
+
+  return scopedName.slice(authorization.scopedNamePrefix.length);
+};
+
+const getMasterKey = async (env: Env): Promise<CryptoKey> => {
+  const keyMaterial =
+    parseOptionalString(env.INTERNAL_WALLET_MASTER_KEY) ??
+    "internal-wallet-mcp-dev-key";
+
+  try {
+    const base64Bytes = fromBase64(keyMaterial);
+    if (base64Bytes.byteLength === 32) {
+      return importAesGcmKey(base64Bytes);
+    }
+  } catch {
+    // Fall through to alternate key material parsing.
+  }
+
+  if (
+    isHex(keyMaterial) &&
+    keyMaterial.startsWith("0x") &&
+    keyMaterial.length === 66
+  ) {
+    return importAesGcmKey(hexToBytes(keyMaterial));
+  }
+
+  const derived = await deriveSha256(keyMaterial);
+  return importAesGcmKey(derived);
 };
 
 const encryptPrivateKey = async (
@@ -310,7 +393,8 @@ const mapStoredAccount = (
     encrypted_private_key: string;
     iv: string;
     created_at: string;
-  } | null
+  } | null,
+  authorization: AuthorizationContext
 ): StoredAccount | null => {
   if (!value) {
     return null;
@@ -320,8 +404,13 @@ const mapStoredAccount = (
     throw new Error(`Stored address for account ${value.name} is invalid`);
   }
 
+  const unscopedName = parseScopedAccountName(value.name, authorization);
+  if (!unscopedName) {
+    return null;
+  }
+
   return {
-    name: value.name,
+    name: unscopedName,
     address: value.address,
     encryptedPrivateKey: value.encrypted_private_key,
     iv: value.iv,
@@ -331,15 +420,17 @@ const mapStoredAccount = (
 
 const getAccountByName = async (
   env: Env,
-  name: string
+  name: string,
+  authorization: AuthorizationContext
 ): Promise<StoredAccount | null> => {
   await ensureSchema(env);
   const db = requireDatabase(env);
+  const scopedName = buildScopedAccountName(name, authorization);
   const row = await db
     .prepare(
       "SELECT name, address, encrypted_private_key, iv, created_at FROM wallet_accounts WHERE name = ?1"
     )
-    .bind(name)
+    .bind(scopedName)
     .first<{
       name: string;
       address: string;
@@ -347,12 +438,13 @@ const getAccountByName = async (
       iv: string;
       created_at: string;
     }>();
-  return mapStoredAccount(row ?? null);
+  return mapStoredAccount(row ?? null, authorization);
 };
 
 const getAccountByAddress = async (
   env: Env,
-  address: Address
+  address: Address,
+  authorization: AuthorizationContext
 ): Promise<StoredAccount | null> => {
   await ensureSchema(env);
   const db = requireDatabase(env);
@@ -368,13 +460,15 @@ const getAccountByAddress = async (
       iv: string;
       created_at: string;
     }>();
-  return mapStoredAccount(row ?? null);
+  return mapStoredAccount(row ?? null, authorization);
 };
 
 const createAccount = async (
   env: Env,
-  name: string
+  name: string,
+  authorization: AuthorizationContext
 ): Promise<StoredAccount> => {
+  const scopedName = buildScopedAccountName(name, authorization);
   const privateKey = generatePrivateKey();
   const account = privateKeyToAccount(privateKey);
   const encrypted = await encryptPrivateKey(privateKey, env);
@@ -387,7 +481,7 @@ const createAccount = async (
         "INSERT INTO wallet_accounts(name, address, encrypted_private_key, iv, created_at) VALUES (?1, ?2, ?3, ?4, ?5)"
       )
       .bind(
-        name,
+        scopedName,
         account.address.toLowerCase(),
         encrypted.encryptedPrivateKey,
         encrypted.iv,
@@ -397,7 +491,7 @@ const createAccount = async (
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (message.includes("UNIQUE") || message.includes("constraint")) {
-      const existing = await getAccountByName(env, name);
+      const existing = await getAccountByName(env, name, authorization);
       if (existing) {
         return existing;
       }
@@ -405,7 +499,7 @@ const createAccount = async (
     throw error;
   }
 
-  const created = await getAccountByName(env, name);
+  const created = await getAccountByName(env, name, authorization);
   if (!created) {
     throw new Error("Failed to create account");
   }
@@ -415,7 +509,8 @@ const createAccount = async (
 
 const loadAccountSigner = async (
   env: Env,
-  args: Record<string, unknown>
+  args: Record<string, unknown>,
+  authorization: AuthorizationContext
 ): Promise<{ stored: StoredAccount; signer: PrivateKeyAccount }> => {
   const accountAddress = args.accountAddress;
   const accountName = args.accountName;
@@ -432,11 +527,13 @@ const loadAccountSigner = async (
     accountAddress !== undefined
       ? await getAccountByAddress(
           env,
-          parseAddress(accountAddress, "accountAddress")
+          parseAddress(accountAddress, "accountAddress"),
+          authorization
         )
       : await getAccountByName(
           env,
-          parseRequiredString(accountName, "accountName")
+          parseRequiredString(accountName, "accountName"),
+          authorization
         );
 
   if (!stored) {
@@ -661,37 +758,14 @@ const parseTokenMap = (env: Env): TokenMap => {
   }
 };
 
-const parseFaucetAmountMap = (env: Env): Record<string, bigint> => {
-  const raw = env.INTERNAL_WALLET_FAUCET_AMOUNT_MAP_JSON;
-  if (!raw) {
-    return {};
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    const mapped: Record<string, bigint> = {};
-    for (const [token, value] of Object.entries(parsed)) {
-      if (typeof value !== "string" || value.trim().length === 0) {
-        continue;
-      }
-
-      mapped[token.toLowerCase()] = BigInt(value);
-    }
-    return mapped;
-  } catch {
-    throw new Error(
-      "INTERNAL_WALLET_FAUCET_AMOUNT_MAP_JSON must be valid JSON object"
-    );
-  }
-};
-
 const handleGetOrCreateEvmAccount = async (
   args: Record<string, unknown>,
-  env: Env
+  env: Env,
+  authorization: AuthorizationContext
 ): Promise<ToolCallResponse> => {
   const name = parseRequiredString(args.name, "name");
-  const existing = await getAccountByName(env, name);
-  const account = existing ?? (await createAccount(env, name));
+  const existing = await getAccountByName(env, name, authorization);
+  const account = existing ?? (await createAccount(env, name, authorization));
 
   return createResult({
     name: account.name,
@@ -704,9 +778,10 @@ const handleGetOrCreateEvmAccount = async (
 
 const handleGetEvmAccount = async (
   args: Record<string, unknown>,
-  env: Env
+  env: Env,
+  authorization: AuthorizationContext
 ): Promise<ToolCallResponse> => {
-  const { stored } = await loadAccountSigner(env, args);
+  const { stored } = await loadAccountSigner(env, args, authorization);
 
   return createResult({
     name: stored.name,
@@ -717,92 +792,12 @@ const handleGetEvmAccount = async (
   });
 };
 
-const handleRequestEvmFaucet = async (
-  args: Record<string, unknown>,
-  env: Env
-): Promise<ToolCallResponse> => {
-  const recipient = await loadAccountSigner(env, args);
-  const { network, requested, chainId } = resolveNetworkInput(
-    args.network,
-    env
-  );
-  const token = (parseOptionalString(args.token) ?? "eth").toLowerCase();
-  const faucetKey = parseOptionalHex(
-    env.INTERNAL_WALLET_FAUCET_PRIVATE_KEY,
-    "INTERNAL_WALLET_FAUCET_PRIVATE_KEY"
-  );
-
-  if (!faucetKey) {
-    throw new Error(
-      "Faucet is not configured. Set INTERNAL_WALLET_FAUCET_PRIVATE_KEY to enable this tool."
-    );
-  }
-
-  const faucetSigner = privateKeyToAccount(faucetKey);
-  const { chain, rpcUrl } = await resolveChain(network, chainId);
-  const transport = http(rpcUrl);
-  const walletClient = createWalletClient({
-    account: faucetSigner,
-    chain,
-    transport,
-  });
-
-  const amountMap = parseFaucetAmountMap(env);
-
-  if (token === "eth") {
-    const value = amountMap.eth ?? BigInt(DEFAULT_FAUCET_NATIVE_AMOUNT_WEI);
-    const transactionHash = await walletClient.sendTransaction({
-      account: faucetSigner,
-      chain,
-      to: recipient.stored.address,
-      value,
-    });
-
-    return createResult({
-      address: recipient.stored.address,
-      requestedNetwork: requested,
-      network,
-      token,
-      amount: value.toString(),
-      transactionHash,
-    });
-  }
-
-  const tokenMap = parseTokenMap(env);
-  const tokenAddress =
-    tokenMap[requested]?.[token] ?? tokenMap[network]?.[token] ?? undefined;
-  if (!tokenAddress) {
-    throw new Error(
-      `Unsupported faucet token ${token}. Configure INTERNAL_WALLET_TOKEN_MAP_JSON for this network.`
-    );
-  }
-
-  const amount = amountMap[token] ?? 1_000_000n;
-  const transactionHash = await walletClient.writeContract({
-    account: faucetSigner,
-    chain,
-    address: tokenAddress,
-    abi: erc20Abi,
-    functionName: "transfer",
-    args: [recipient.stored.address, amount],
-  });
-
-  return createResult({
-    address: recipient.stored.address,
-    requestedNetwork: requested,
-    network,
-    token,
-    tokenAddress,
-    amount: amount.toString(),
-    transactionHash,
-  });
-};
-
 const handleListEvmTokenBalances = async (
   args: Record<string, unknown>,
-  env: Env
+  env: Env,
+  authorization: AuthorizationContext
 ): Promise<ToolCallResponse> => {
-  const { stored } = await loadAccountSigner(env, args);
+  const { stored } = await loadAccountSigner(env, args, authorization);
   const { network, requested, chainId } = resolveNetworkInput(
     args.network,
     env
@@ -890,9 +885,10 @@ const handleListEvmTokenBalances = async (
 
 const handleSignEvmTransaction = async (
   args: Record<string, unknown>,
-  env: Env
+  env: Env,
+  authorization: AuthorizationContext
 ): Promise<ToolCallResponse> => {
-  const { stored, signer } = await loadAccountSigner(env, args);
+  const { stored, signer } = await loadAccountSigner(env, args, authorization);
   const serializedTransaction = parseOptionalHex(
     args.serializedTransaction,
     "serializedTransaction"
@@ -916,9 +912,10 @@ const handleSignEvmTransaction = async (
 
 const handleSendEvmTransaction = async (
   args: Record<string, unknown>,
-  env: Env
+  env: Env,
+  authorization: AuthorizationContext
 ): Promise<ToolCallResponse> => {
-  const { stored, signer } = await loadAccountSigner(env, args);
+  const { stored, signer } = await loadAccountSigner(env, args, authorization);
   const { network, requested, chainId } = resolveNetworkInput(
     args.network,
     env,
@@ -1082,12 +1079,17 @@ export const walletToolDefinitions = [
     inputSchema: {
       type: "object",
       properties: {
+        seed: {
+          type: "string",
+          description:
+            "Authorization seed used to scope wallet ownership and access.",
+        },
         name: {
           type: "string",
           description: "Logical account name.",
         },
       },
-      required: ["name"],
+      required: ["seed", "name"],
       additionalProperties: false,
     },
     securitySchemes: [{ type: "noauth" }],
@@ -1102,6 +1104,11 @@ export const walletToolDefinitions = [
     inputSchema: {
       type: "object",
       properties: {
+        seed: {
+          type: "string",
+          description:
+            "Authorization seed used to scope wallet ownership and access.",
+        },
         accountAddress: {
           type: "string",
           description: "EVM address of the account.",
@@ -1111,36 +1118,7 @@ export const walletToolDefinitions = [
           description: "Name of the account.",
         },
       },
-      additionalProperties: false,
-    },
-    securitySchemes: [{ type: "noauth" }],
-    _meta: {
-      securitySchemes: [{ type: "noauth" }],
-    },
-  },
-  {
-    name: TOOL_REQUEST_EVM_FAUCET,
-    title: "Wallet Request EVM Faucet",
-    description: "Request testnet faucet funds for a server wallet account.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        accountAddress: {
-          type: "string",
-        },
-        accountName: {
-          type: "string",
-        },
-        network: {
-          type: "string",
-          description:
-            "Optional network name, alias, or RPC URL. Defaults to WALLET_DEFAULT_NETWORK.",
-        },
-        token: {
-          type: "string",
-          description: "Optional faucet token. Defaults to eth.",
-        },
-      },
+      required: ["seed"],
       additionalProperties: false,
     },
     securitySchemes: [{ type: "noauth" }],
@@ -1155,6 +1133,11 @@ export const walletToolDefinitions = [
     inputSchema: {
       type: "object",
       properties: {
+        seed: {
+          type: "string",
+          description:
+            "Authorization seed used to scope wallet ownership and access.",
+        },
         accountAddress: {
           type: "string",
         },
@@ -1173,6 +1156,7 @@ export const walletToolDefinitions = [
           type: "string",
         },
       },
+      required: ["seed"],
       additionalProperties: false,
     },
     securitySchemes: [{ type: "noauth" }],
@@ -1187,6 +1171,11 @@ export const walletToolDefinitions = [
     inputSchema: {
       type: "object",
       properties: {
+        seed: {
+          type: "string",
+          description:
+            "Authorization seed used to scope wallet ownership and access.",
+        },
         accountAddress: {
           type: "string",
         },
@@ -1201,7 +1190,7 @@ export const walletToolDefinitions = [
           type: "string",
         },
       },
-      required: ["serializedTransaction"],
+      required: ["seed", "serializedTransaction"],
       additionalProperties: false,
     },
     securitySchemes: [{ type: "noauth" }],
@@ -1217,6 +1206,11 @@ export const walletToolDefinitions = [
     inputSchema: {
       type: "object",
       properties: {
+        seed: {
+          type: "string",
+          description:
+            "Authorization seed used to scope wallet ownership and access.",
+        },
         accountAddress: {
           type: "string",
         },
@@ -1258,7 +1252,7 @@ export const walletToolDefinitions = [
           type: "string",
         },
       },
-      required: ["to"],
+      required: ["seed", "to"],
       additionalProperties: false,
     },
     securitySchemes: [{ type: "noauth" }],
@@ -1274,6 +1268,11 @@ export const walletToolDefinitions = [
     inputSchema: {
       type: "object",
       properties: {
+        seed: {
+          type: "string",
+          description:
+            "Authorization seed used to scope wallet ownership and access.",
+        },
         graphqlUrl: {
           type: "string",
           description:
@@ -1292,7 +1291,7 @@ export const walletToolDefinitions = [
           description: "Token amount string expected by the forkTopUp API.",
         },
       },
-      required: ["user", "currency", "value"],
+      required: ["seed", "user", "currency", "value"],
       additionalProperties: false,
     },
     securitySchemes: [{ type: "noauth" }],
@@ -1313,31 +1312,29 @@ export const handleWalletToolCall = async (
   const args = parseRecord(call.arguments);
 
   try {
+    const authorization = await buildAuthorizationContext(args, env);
+
     if (call.name === TOOL_GET_OR_CREATE_EVM_ACCOUNT) {
-      return await handleGetOrCreateEvmAccount(args, env);
+      return await handleGetOrCreateEvmAccount(args, env, authorization);
     }
 
     if (call.name === TOOL_GET_EVM_ACCOUNT) {
-      return await handleGetEvmAccount(args, env);
-    }
-
-    if (call.name === TOOL_REQUEST_EVM_FAUCET) {
-      return await handleRequestEvmFaucet(args, env);
+      return await handleGetEvmAccount(args, env, authorization);
     }
 
     if (call.name === TOOL_LIST_EVM_TOKEN_BALANCES) {
-      return await handleListEvmTokenBalances(args, env);
+      return await handleListEvmTokenBalances(args, env, authorization);
     }
 
     if (call.name === TOOL_SIGN_EVM_TRANSACTION) {
-      return await handleSignEvmTransaction(args, env);
+      return await handleSignEvmTransaction(args, env, authorization);
     }
 
     if (call.name === TOOL_AAVE_FORK_TOP_UP) {
       return await handleAaveForkTopUp(args, env);
     }
 
-    return await handleSendEvmTransaction(args, env);
+    return await handleSendEvmTransaction(args, env, authorization);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return {

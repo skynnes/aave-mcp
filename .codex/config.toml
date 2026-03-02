@@ -1,0 +1,8 @@
+[mcp_servers.aave_v3]
+url = "http://localhost:8787/mcp/v3"
+
+[mcp_servers.aave_v4]
+url = "http://localhost:8787/mcp/v4"
+
+[mcp_servers.wallet]
+url = "http://localhost:8788/mcp"

@@ -1,10 +1,11 @@
 {
-  "name": "aave-mcp",
+  "name": "cdp-wallet-mcp",
   "private": true,
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "bunx wrangler dev --port 8787",
+    "dev": "bunx wrangler dev --port 8789 --inspector-port 9230",
+    "dev:cdp": "bun run dev",
     "build": "bunx wrangler deploy --dry-run",
     "deploy": "bunx wrangler deploy",
     "check": "bunx ultracite check src package.json tsconfig.json wrangler.toml README.md",
@@ -12,7 +13,10 @@
     "types": "bunx wrangler types",
     "typecheck": "bun run types && tsc --noEmit"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@coinbase/cdp-sdk": "^1.44.1",
+    "viem": "^2.46.3"
+  },
   "devDependencies": {
     "typescript": "catalog:workers",
     "wrangler": "^4.66.0"

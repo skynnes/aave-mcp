@@ -3,10 +3,10 @@ export const homeHtml = `<!doctype html>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Aave MCP Codemode</title>
+    <title>Internal Wallet MCP</title>
   </head>
   <body>
-    <h1>Aave MCP Codemode</h1>
-    <p>MCP endpoints: <code>/mcp/v3</code> and <code>/mcp/v4</code> (<code>/mcp</code> defaults to v4)</p>
+    <h1>Internal Wallet MCP</h1>
+    <p>MCP endpoint: <code>/mcp</code></p>
   </body>
 </html>`;

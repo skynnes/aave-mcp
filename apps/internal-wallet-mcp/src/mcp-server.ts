@@ -3,7 +3,7 @@ import { jsonRpcError, jsonRpcResult, parseJson } from "./rpc";
 import { listTools } from "./tools";
 import type { Env, JsonRpcRequest } from "./types";
 
-const APP_NAME = "wallet-mcp";
+const APP_NAME = "internal-wallet-mcp";
 const APP_VERSION = "0.1.0";
 
 export const handleMcp = async (

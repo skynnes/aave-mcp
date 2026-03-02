@@ -8,8 +8,11 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "turbo run dev",
+    "dev": "turbo run dev --filter=aave-mcp --filter=internal-wallet-mcp",
+    "dev:all": "turbo run dev",
+    "dev:cdp": "turbo run dev --filter=cdp-wallet-mcp",
     "build": "turbo run build",
+    "deploy": "turbo run deploy --filter=./apps/*",
     "typecheck": "turbo run typecheck",
     "check": "turbo run check",
     "fix": "turbo run fix",

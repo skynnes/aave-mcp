@@ -1,8 +1,8 @@
-# Wallet MCP Server (Cloudflare Workers)
+# CDP Wallet MCP Server (Cloudflare Workers)
 
-This app is a dedicated MCP server for wallet bootstrapping, signing, and transaction submission using Coinbase CDP server wallets.
+MCP server for wallet bootstrapping, signing, and transaction submission using Coinbase CDP server wallets.
 
-## What this app includes
+## Endpoint and tools
 
 - MCP endpoint: `/mcp`
 - Tool: `public_healthcheck`
@@ -16,10 +16,16 @@ This app is a dedicated MCP server for wallet bootstrapping, signing, and transa
 
 ## Run locally
 
+From this directory:
+
 ```sh
 bun install
 bun run dev
 ```
+
+Alias: `bun run dev:cdp`
+
+Local MCP URL: `http://localhost:8789/mcp`
 
 ## Required secrets
 
@@ -29,14 +35,14 @@ wrangler secret put CDP_API_KEY_SECRET
 wrangler secret put CDP_WALLET_SECRET
 ```
 
-## Custom network support (Aave v4 demo)
+## Optional network configuration
 
-You can pass a `network` per tool call.
+You can pass `network` per tool call.
 
 - Known CDP network names are supported (for example `base-sepolia`).
-- Custom RPC URLs are supported for transaction submission/signing. For non-CDP chains, the server signs via CDP and broadcasts the raw transaction directly to your RPC.
+- Custom RPC URLs are supported for signing/submission. For non-CDP chains, the server signs via CDP and broadcasts raw transactions directly to your RPC.
 
-Optional alias mapping in `wrangler.toml`:
+Example alias mapping in `wrangler.toml`:
 
 ```toml
 [vars]
@@ -44,11 +50,9 @@ WALLET_NETWORK_MAP_JSON = '{"aave-v4":{"rpcUrl":"https://rpc.your-demo-chain.exa
 WALLET_DEFAULT_NETWORK = "aave-v4"
 ```
 
-You can also pass `chainId` directly to `wallet_send_evm_transaction` (for example `123456789`) if you need to override the mapped value.
+If `WALLET_ALLOWED_NETWORKS` is set, only values in that comma-separated allowlist are accepted.
 
-If you set `WALLET_ALLOWED_NETWORKS`, only values in that comma-separated list are accepted (matches alias or resolved value).
-
-## Aave fork top up helper
+## Aave fork top-up helper
 
 Use `wallet_aave_fork_top_up` to call the fork funding mutation.
 
@@ -62,4 +66,4 @@ Example tool args:
 }
 ```
 
-Set `AAVE_GRAPHQL_URL` in Worker vars (or pass `graphqlUrl` per call).
+Set `AAVE_GRAPHQL_URL` in Worker vars, or pass `graphqlUrl` per call.

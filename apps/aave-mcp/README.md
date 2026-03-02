@@ -1,31 +1,30 @@
-# Aave MCP Codemode Server (Cloudflare Workers)
+# Aave MCP Server (Cloudflare Workers)
 
-This app is a focused MCP server for Aave schema exploration and GraphQL execution in codemode.
+MCP server for Aave schema exploration and GraphQL execution.
 
-## What this app includes
+## Endpoints and tools
 
 - MCP endpoints: `/mcp/v3` and `/mcp/v4` (`/mcp` defaults to v4)
-- No OAuth requirement (`noauth` tools)
 - Tool: `public_healthcheck`
 - Tool: `search_aave_schema`
 - Tool: `execute_aave_graphql`
 
 ## Run locally
 
+From this directory:
+
 ```sh
 bun install
 bun run dev
 ```
 
-## MCP endpoint
+## MCP URLs
 
-- Local: `http://localhost:8787/mcp/v3` or `http://localhost:8787/mcp/v4`
-- Deployed: `https://<your-worker>.workers.dev/mcp/v3` or `https://<your-worker>.workers.dev/mcp/v4`
-- Default alias: `http://localhost:8787/mcp` and `https://<your-worker>.workers.dev/mcp` route to v4
+- Local: `http://localhost:8787/mcp/v3`, `http://localhost:8787/mcp/v4`, `http://localhost:8787/mcp`
+- Custom domain route: `https://aave.sam.engineer/mcp*`
+- Deployed: `https://<your-worker>.workers.dev/mcp/v3`, `https://<your-worker>.workers.dev/mcp/v4`, `https://<your-worker>.workers.dev/mcp`
 
-## Version routing
-
-This worker now routes by path instead of Wrangler environments:
+## Path-based version routing
 
 - `/mcp/v3` -> `https://api.v3.aave.com/graphql`
 - `/mcp/v4` -> `https://api.aave.com/graphql`

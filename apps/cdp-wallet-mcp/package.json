@@ -1,13 +1,15 @@
 {
-  "name": "wallet-mcp",
+  "name": "cdp-wallet-mcp",
   "private": true,
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev:cdp": "wrangler dev --port 8788 --inspector-port 9230",
-    "build": "wrangler deploy --dry-run",
-    "check": "ultracite check src package.json tsconfig.json wrangler.toml README.md",
-    "fix": "ultracite fix src package.json tsconfig.json wrangler.toml README.md",
+    "dev": "bunx wrangler dev --port 8789 --inspector-port 9230",
+    "dev:cdp": "bun run dev",
+    "build": "bunx wrangler deploy --dry-run",
+    "deploy": "bunx wrangler deploy",
+    "check": "bunx ultracite check src package.json tsconfig.json wrangler.toml README.md",
+    "fix": "bunx ultracite fix src package.json tsconfig.json wrangler.toml README.md",
     "types": "bunx wrangler types",
     "typecheck": "bun run types && tsc --noEmit"
   },

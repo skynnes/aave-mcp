@@ -8,3 +8,7 @@ binding = "LOADER"
 
 [placement]
 mode = "smart"
+
+[[routes]]
+pattern = "aave.sam.engineer/mcp*"
+zone_name = "sam.engineer"

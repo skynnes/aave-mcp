@@ -9,19 +9,19 @@ mode = "smart"
 [[d1_databases]]
 binding = "DB"
 database_name = "internal-wallet-mcp"
-database_id = "replace-with-your-d1-database-id"
+database_id = "6407a19e-0058-4588-b7e8-d9907dc9746e"
 
 [vars]
 # 32-byte base64 key used to encrypt persisted private keys.
 # Generate with: openssl rand -base64 32
-INTERNAL_WALLET_MASTER_KEY = "replace-with-32-byte-base64-key"
+# INTERNAL_WALLET_MASTER_KEY = "replace-with-32-byte-base64-key"
 
 # Optional pepper used when deriving auth scope from tool-provided seed values.
 # Keep this secret to make seed brute-force harder if database rows are exposed.
 # INTERNAL_WALLET_AUTH_PEPPER = "replace-with-secret-pepper"
 
 # Optional default network. Can be a known name (for example base-sepolia) or RPC URL.
-WALLET_DEFAULT_NETWORK = "base-sepolia"
+WALLET_DEFAULT_NETWORK = "aave-v4"
 
 # Optional alias map for network names.
 # WALLET_NETWORK_MAP_JSON = '{"aave-v4":{"rpcUrl":"https://rpc.example","chainId":123456789}}'

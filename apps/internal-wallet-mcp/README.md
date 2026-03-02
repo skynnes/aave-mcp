@@ -1,21 +1,21 @@
 # Internal Wallet MCP Server (Cloudflare Workers)
 
-This app is a local-only/internal MCP server for testing `aave-mcp` without Coinbase CDP.
+Local/internal MCP wallet server for testing without Coinbase CDP.
 
 It uses:
 
 - `viem` for account management and transaction signing
 - Cloudflare D1 for encrypted private-key persistence
-- Worker vars for network/faucet configuration
+- Worker vars for network and token configuration
 
 ## Authorization model
 
 - Every wallet tool call must include a `seed` argument.
-- The server derives a deterministic internal scope from the seed and stores wallet names as scoped keys.
-- The same `seed + account name` resolves to the same wallet; different seeds cannot fetch each other's wallets.
-- If a wallet does not exist for that scope, `wallet_get_or_create_evm_account` creates it.
+- The server derives a deterministic scope from that seed.
+- The same `seed + account name` resolves to the same wallet.
+- Different seeds cannot fetch each other's wallets.
 
-## What this app includes
+## Endpoint and tools
 
 - MCP endpoint: `/mcp`
 - Tool: `public_healthcheck`
@@ -28,28 +28,30 @@ It uses:
 
 ## Quick start
 
-1. Create D1 database
+1. Create a D1 database:
 
 ```sh
 wrangler d1 create internal-wallet-mcp
 ```
 
-2. Update `wrangler.toml` with the returned `database_id`
+2. Put the returned `database_id` into `wrangler.toml` (`[[d1_databases]]` section).
 
-3. Generate and set a 32-byte base64 encryption key
+3. Generate a 32-byte base64 key:
 
 ```sh
 openssl rand -base64 32
 ```
 
-Then set `INTERNAL_WALLET_MASTER_KEY` in `wrangler.toml` or as a Wrangler secret.
+4. Set `INTERNAL_WALLET_MASTER_KEY` in Worker vars or as a Wrangler secret.
 
-4. Run locally
+5. Run locally from this directory:
 
 ```sh
 bun install
 bun run dev
 ```
+
+Local MCP URL: `http://localhost:8788/mcp`
 
 ## Required configuration
 
@@ -58,12 +60,12 @@ bun run dev
 
 ## Optional configuration
 
-- `INTERNAL_WALLET_AUTH_PEPPER` secret pepper mixed into seed hashing
-- `WALLET_DEFAULT_NETWORK` default network alias or RPC URL
-- `WALLET_NETWORK_MAP_JSON` alias to RPC map
-- `WALLET_ALLOWED_NETWORKS` comma-separated allowlist
-- `INTERNAL_WALLET_TOKEN_MAP_JSON` token addresses for balance listing
-- `AAVE_GRAPHQL_URL` default GraphQL endpoint for `wallet_aave_fork_top_up`
+- `INTERNAL_WALLET_AUTH_PEPPER`: secret pepper mixed into seed hashing
+- `WALLET_DEFAULT_NETWORK`: default network alias or RPC URL
+- `WALLET_NETWORK_MAP_JSON`: alias-to-RPC map
+- `WALLET_ALLOWED_NETWORKS`: comma-separated allowlist
+- `INTERNAL_WALLET_TOKEN_MAP_JSON`: token address map used by balance listing
+- `AAVE_GRAPHQL_URL`: default GraphQL endpoint for `wallet_aave_fork_top_up`
 
 Example:
 
@@ -77,8 +79,7 @@ WALLET_ALLOWED_NETWORKS = "aave-v4,base-sepolia"
 INTERNAL_WALLET_TOKEN_MAP_JSON = '{"aave-v4":{"usdc":"0x..."}}'
 ```
 
-Tool usage note:
+Every wallet tool call should include `seed`, for example:
 
-- Add `seed` to every wallet tool call, for example:
-  - `wallet_get_or_create_evm_account` with `{ "seed": "user-123-secret", "name": "default" }`
-  - `wallet_get_evm_account` with `{ "seed": "user-123-secret", "accountName": "default" }`
+- `wallet_get_or_create_evm_account` with `{ "seed": "user-123-secret", "name": "default" }`
+- `wallet_get_evm_account` with `{ "seed": "user-123-secret", "accountName": "default" }`

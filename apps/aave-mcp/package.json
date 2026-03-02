@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "bunx wrangler dev --port 8787",
     "build": "bunx wrangler deploy --dry-run",
+    "deploy": "bunx wrangler deploy",
     "check": "bunx ultracite check src package.json tsconfig.json wrangler.toml README.md",
     "fix": "bunx ultracite fix src package.json tsconfig.json wrangler.toml README.md",
     "types": "bunx wrangler types",

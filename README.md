@@ -4,7 +4,7 @@ Monorepo for Cloudflare Worker-based MCP servers used for Aave data access and w
 
 ## Workspace layout
 
-- `apps/aave-mcp`: Aave GraphQL MCP server with `/mcp/v3` and `/mcp/v4` endpoints
+- `apps/aave-mcp`: Aave v4 SDK codemode MCP server with `/mcp` and `/mcp/v4` endpoints
 - `apps/cdp-wallet-mcp`: Wallet MCP server backed by Coinbase CDP server wallets
 - `apps/internal-wallet-mcp`: Local/internal wallet MCP server backed by D1 + `viem`
 - `packages/tsconfig`: shared TypeScript config
@@ -48,7 +48,7 @@ bun run inspector
 
 | App | Path | Local URL | Local script | Required secrets/config |
 | --- | --- | --- | --- | --- |
-| Aave MCP | `apps/aave-mcp` | `http://localhost:8787/mcp/v3`, `http://localhost:8787/mcp/v4`, `http://localhost:8787/mcp` | `cd apps/aave-mcp && bun run dev` | None |
+| Aave MCP | `apps/aave-mcp` | `http://localhost:8787/mcp`, `http://localhost:8787/mcp/v4` | `cd apps/aave-mcp && bun run dev` | None |
 | Internal Wallet MCP | `apps/internal-wallet-mcp` | `http://localhost:8788/mcp` | `cd apps/internal-wallet-mcp && bun run dev` | D1 `DB` binding + `INTERNAL_WALLET_MASTER_KEY` |
 | CDP Wallet MCP | `apps/cdp-wallet-mcp` | `http://localhost:8789/mcp` | `bun run dev:cdp` or `cd apps/cdp-wallet-mcp && bun run dev` | `CDP_API_KEY_ID`, `CDP_API_KEY_SECRET`, `CDP_WALLET_SECRET` |
 

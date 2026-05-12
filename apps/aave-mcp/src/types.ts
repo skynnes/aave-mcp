@@ -9,7 +9,6 @@ export interface JsonRpcRequest {
 
 export interface Env {
   LOADER: WorkerLoader;
-  AAVE_GRAPHQL_URL?: string;
 }
 
 export interface ToolCallParams {

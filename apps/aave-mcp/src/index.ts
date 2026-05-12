@@ -1,16 +1,10 @@
 import { homeHtml } from "./home";
 import { handleMcp } from "./mcp-server";
+import { postOnlyMessage } from "./protocol-guidance";
 import { json } from "./rpc";
 import type { Env } from "./types";
 
-const AAVE_V3_GRAPHQL_URL = "https://api.v3.aave.com/graphql";
-const AAVE_V4_GRAPHQL_URL = "https://api.aave.com/graphql";
-
-const endpointByPath: Record<string, string> = {
-  "/mcp": AAVE_V4_GRAPHQL_URL,
-  "/mcp/v3": AAVE_V3_GRAPHQL_URL,
-  "/mcp/v4": AAVE_V4_GRAPHQL_URL,
-};
+const mcpPaths = new Set(["/mcp", "/mcp/v4"]);
 
 export default {
   fetch(request: Request, env: Env) {
@@ -34,18 +28,14 @@ export default {
       });
     }
 
-    const endpoint = endpointByPath[url.pathname];
-    if (!endpoint) {
+    if (!mcpPaths.has(url.pathname)) {
       return new Response("Not found", { status: 404 });
     }
 
     if (request.method !== "POST") {
-      return json({ error: "Use POST for MCP requests" }, 405);
+      return json({ error: postOnlyMessage }, 405);
     }
 
-    return handleMcp(request, {
-      ...env,
-      AAVE_GRAPHQL_URL: endpoint,
-    });
+    return handleMcp(request, env);
   },
 };

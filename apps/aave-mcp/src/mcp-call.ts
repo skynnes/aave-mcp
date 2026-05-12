@@ -1,8 +1,17 @@
+import { executeAaveSdkCode } from "./aave-sdk";
 import {
-  createAaveExecuteExecutor,
-  createAaveSearchExecutor,
-  truncateResponse,
-} from "./codemode";
+  AAVE_SDK_TYPES,
+  getAaveSdkReference,
+  isAaveSdkActionName,
+} from "./aave-sdk-reference";
+import { addAaveSdkErrorGuidance } from "./error-guidance";
+import {
+  invalidToolCallParamsMessage,
+  missingCodeArgumentMessage,
+  unknownAaveActionMessage,
+  unknownToolMessage,
+} from "./mcp-guidance";
+import { truncateResponse } from "./response-serializer";
 import type { Env, ToolCallParams } from "./types";
 
 const parseToolCallParams = (params: unknown): ToolCallParams | null => {
@@ -38,6 +47,12 @@ const getCodeArgument = (
   return typeof args?.code === "string" ? args.code : null;
 };
 
+const getActionArgument = (
+  args: Record<string, unknown> | undefined
+): string | undefined => {
+  return typeof args?.action === "string" ? args.action : undefined;
+};
+
 export const handleMcpCall = async (
   params: unknown,
   env: Env
@@ -45,7 +60,7 @@ export const handleMcpCall = async (
   const parsed = parseToolCallParams(params);
   if (!parsed) {
     return {
-      error: "Invalid tools/call params",
+      error: invalidToolCallParamsMessage,
       code: -32_602,
     };
   }
@@ -56,19 +71,42 @@ export const handleMcpCall = async (
         content: [
           {
             type: "text",
-            text: "Aave MCP codemode endpoint is healthy.",
+            text: "Aave MCP SDK codemode endpoint is healthy.",
           },
         ],
       },
     };
   }
 
-  if (
-    parsed.name !== "search_aave_schema" &&
-    parsed.name !== "execute_aave_graphql"
-  ) {
+  if (parsed.name === "get_aave_sdk_reference") {
+    const action = getActionArgument(parsed.arguments);
+    if (action !== undefined && !isAaveSdkActionName(action)) {
+      return {
+        error: unknownAaveActionMessage(action),
+        code: -32_602,
+      };
+    }
+
     return {
-      error: `Unknown tool: ${parsed.name}`,
+      result: {
+        content: [
+          { type: "text", text: truncateResponse(getAaveSdkReference(action)) },
+        ],
+      },
+    };
+  }
+
+  if (parsed.name === "get_aave_sdk_types") {
+    return {
+      result: {
+        content: [{ type: "text", text: AAVE_SDK_TYPES }],
+      },
+    };
+  }
+
+  if (parsed.name !== "execute_aave_sdk_code") {
+    return {
+      error: unknownToolMessage(parsed.name),
       code: -32_601,
     };
   }
@@ -76,18 +114,13 @@ export const handleMcpCall = async (
   const code = getCodeArgument(parsed.arguments);
   if (!code) {
     return {
-      error: "Missing required code argument",
+      error: missingCodeArgumentMessage,
       code: -32_602,
     };
   }
 
-  const runner =
-    parsed.name === "search_aave_schema"
-      ? createAaveSearchExecutor(env)
-      : createAaveExecuteExecutor(env);
-
   try {
-    const result = await runner(code);
+    const result = await executeAaveSdkCode(env, code);
     return {
       result: {
         content: [{ type: "text", text: truncateResponse(result) }],
@@ -96,7 +129,7 @@ export const handleMcpCall = async (
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return {
-      error: message,
+      error: addAaveSdkErrorGuidance(message),
       code: -32_603,
     };
   }

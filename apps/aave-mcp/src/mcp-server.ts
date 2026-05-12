@@ -1,4 +1,9 @@
 import { handleMcpCall } from "./mcp-call";
+import {
+  invalidRequestMessage,
+  methodNotFoundMessage,
+  parseErrorMessage,
+} from "./protocol-guidance";
 import { jsonRpcError, jsonRpcResult, parseJson } from "./rpc";
 import { listTools } from "./tools";
 import type { Env, JsonRpcRequest } from "./types";
@@ -14,12 +19,12 @@ export const handleMcp = async (
   const rpc = body as JsonRpcRequest;
 
   if (typeof rpc !== "object" || rpc === null) {
-    return jsonRpcError(null, -32_700, "Parse error");
+    return jsonRpcError(null, -32_700, parseErrorMessage);
   }
 
   const id = rpc.id ?? null;
   if (rpc.jsonrpc !== "2.0" || typeof rpc.method !== "string") {
-    return jsonRpcError(id, -32_600, "Invalid Request");
+    return jsonRpcError(id, -32_600, invalidRequestMessage);
   }
 
   if (rpc.method === "notifications/initialized") {
@@ -62,5 +67,5 @@ export const handleMcp = async (
     return jsonRpcResult(id, callData.result);
   }
 
-  return jsonRpcError(id, -32_601, `Method not found: ${rpc.method}`);
+  return jsonRpcError(id, -32_601, methodNotFoundMessage(rpc.method));
 };

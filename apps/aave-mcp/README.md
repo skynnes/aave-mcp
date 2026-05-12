@@ -1,13 +1,30 @@
 # Aave MCP Server (Cloudflare Workers)
 
-MCP server for Aave schema exploration and GraphQL execution.
+MCP server for Aave v4 SDK codemode execution.
 
 ## Endpoints and tools
 
-- MCP endpoints: `/mcp/v3` and `/mcp/v4` (`/mcp` defaults to v4)
+- MCP endpoints: `/mcp` and `/mcp/v4`
 - Tool: `public_healthcheck`
-- Tool: `search_aave_schema`
-- Tool: `execute_aave_graphql`
+- Tool: `get_aave_sdk_reference`
+- Tool: `get_aave_sdk_types`
+- Tool: `execute_aave_sdk_code`
+
+`execute_aave_sdk_code` runs a TypeScript async arrow function inside a Dynamic
+Worker sandbox. The sandbox exposes an `aave` namespace that maps to
+`@aave/client@v4` actions, with the host Worker owning `AaveClient.create()`.
+
+Example:
+
+```ts
+async () => {
+  const chains = await aave.chains({ query: { filter: "ALL" } });
+  return chains.map((chain) => ({
+    chainId: chain.chainId,
+    name: chain.name,
+  }));
+}
+```
 
 ## Run locally
 
@@ -20,12 +37,14 @@ bun run dev
 
 ## MCP URLs
 
-- Local: `http://localhost:8787/mcp/v3`, `http://localhost:8787/mcp/v4`, `http://localhost:8787/mcp`
+- Local: `http://localhost:8787/mcp`, `http://localhost:8787/mcp/v4`
 - Custom domain route: `https://aave.sam.engineer/mcp*`
-- Deployed: `https://<your-worker>.workers.dev/mcp/v3`, `https://<your-worker>.workers.dev/mcp/v4`, `https://<your-worker>.workers.dev/mcp`
+- Deployed: `https://<your-worker>.workers.dev/mcp`, `https://<your-worker>.workers.dev/mcp/v4`
 
-## Path-based version routing
+## SDK execution
 
-- `/mcp/v3` -> `https://api.v3.aave.com/graphql`
-- `/mcp/v4` -> `https://api.aave.com/graphql`
-- `/mcp` -> `https://api.aave.com/graphql` (v4 default)
+- Uses `@aave/client@v4`, currently pinned through `@aave/client@^4.2.0`.
+- Uses `@cloudflare/codemode` `DynamicWorkerExecutor` with external network
+  access blocked in the sandbox.
+- Host-side SDK calls return JSON-safe results to the sandbox, so BigInt and
+  SDK numeric wrappers are serialized before crossing the Worker RPC boundary.

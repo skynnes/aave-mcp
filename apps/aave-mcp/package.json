@@ -7,13 +7,18 @@
     "dev": "bunx wrangler dev --port 8787",
     "build": "bunx wrangler deploy --dry-run",
     "deploy": "bunx wrangler deploy",
-    "check": "bunx ultracite check src package.json tsconfig.json wrangler.toml README.md",
-    "fix": "bunx ultracite fix src package.json tsconfig.json wrangler.toml README.md",
+    "check": "bunx ultracite check src tests package.json tsconfig.json wrangler.toml README.md",
+    "fix": "bunx ultracite fix src tests package.json tsconfig.json wrangler.toml README.md",
+    "test": "bun test",
     "types": "bunx wrangler types",
     "typecheck": "bun run types && tsc --noEmit"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@aave/client": "^4.2.0",
+    "@cloudflare/codemode": "^0.3.4"
+  },
   "devDependencies": {
+    "@types/node": "^25.6.2",
     "typescript": "catalog:workers",
     "wrangler": "^4.66.0"
   }
